@@ -1,0 +1,8 @@
+name = "secretary-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "secretary-db"
+database_id = "7e55d5a7-d731-4eb4-b1ae-8dcda2ad37e3"

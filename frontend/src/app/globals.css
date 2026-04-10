@@ -1,1 +1,20 @@
 @import "tailwindcss";
+
+/* iOS safe area 하단 여백 */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* 터치 디바이스에서 탭 하이라이트 제거 */
+@media (pointer: coarse) {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* 모바일 input zoom 방지 */
+@media (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}

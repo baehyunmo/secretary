@@ -134,41 +134,41 @@ export default function TripPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-2xl p-5 shadow-sm">
-        <h2 className="text-lg font-semibold mb-4">해외 출장 플래너</h2>
+    <div className="space-y-4 md:space-y-6">
+      <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm">
+        <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4">해외 출장 플래너</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">임원</label>
-            <select value={execId} onChange={(e) => setExecId(e.target.value)} className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm">
+            <select value={execId} onChange={(e) => setExecId(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg">
               {executives.map((e: any) => <option key={e.id} value={e.id}>{e.position} {e.name}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">출발 도시</label>
-            <select value={fromCode} onChange={(e) => setFromCode(e.target.value)} className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm">
+            <select value={fromCode} onChange={(e) => setFromCode(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg">
               {DEPARTURE_CITIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">도착 도시</label>
-            <select value={toCode} onChange={(e) => setToCode(e.target.value)} className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm">
+            <select value={toCode} onChange={(e) => setToCode(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg">
               <option value="">-- 선택 --</option>
               {DESTINATION_CITIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
             </select>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">출발일</label>
-            <input type="date" value={tripDate} onChange={(e) => setTripDate(e.target.value)} className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm" />
+            <input type="date" value={tripDate} onChange={(e) => setTripDate(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg" />
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">귀국일</label>
-            <input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm" />
+            <input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg" />
           </div>
-          <div className="flex items-end">
-            <button onClick={searchTrip} className="w-full bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-600 transition">
+          <div className="col-span-2 md:col-span-1 flex items-end">
+            <button onClick={searchTrip} className="w-full bg-indigo-500 text-white px-4 py-2.5 rounded-lg text-sm hover:bg-indigo-600 transition active:scale-95">
               노선 및 호텔 검색
             </button>
           </div>
@@ -178,8 +178,8 @@ export default function TripPage() {
       {showResults && (
         <>
           {/* 추천 노선 */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <h3 className="font-semibold mb-3 pb-2 border-b">추천 항공 노선</h3>
+          <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm">
+            <h3 className="font-semibold mb-3 pb-2 border-b text-sm md:text-base">추천 항공 노선</h3>
             {routes.length === 0 ? (
               <p className="text-gray-400 text-sm">사전 등록된 노선 정보가 없습니다.</p>
             ) : (
@@ -190,9 +190,9 @@ export default function TripPage() {
                     onClick={() => setSelectedRoute(i)}
                     className={`p-4 rounded-xl border-2 cursor-pointer transition ${selectedRoute === i ? "border-indigo-500 bg-indigo-50" : "border-gray-100 hover:border-indigo-300"}`}
                   >
-                    <div className="font-semibold">{r.stops.length === 0 ? "직항" : `경유: ${r.stops.join(", ")}`} ({r.duration})</div>
-                    <div className="text-sm text-gray-500 mt-1">{r.note}</div>
-                    <div className="flex gap-1 mt-2">
+                    <div className="font-semibold text-sm md:text-base">{r.stops.length === 0 ? "직항" : `경유: ${r.stops.join(", ")}`} ({r.duration})</div>
+                    <div className="text-xs md:text-sm text-gray-500 mt-1">{r.note}</div>
+                    <div className="flex flex-wrap gap-1 mt-2">
                       {r.tags.map((t) => (
                         <span key={t} className={`px-2 py-0.5 rounded-lg text-xs font-semibold ${tagClass[t] || "bg-gray-100 text-gray-500"}`}>{t}</span>
                       ))}
@@ -204,8 +204,8 @@ export default function TripPage() {
           </div>
 
           {/* 추천 호텔 */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <h3 className="font-semibold mb-3 pb-2 border-b">추천 호텔</h3>
+          <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm">
+            <h3 className="font-semibold mb-3 pb-2 border-b text-sm md:text-base">추천 호텔</h3>
             {hotels.length === 0 ? (
               <p className="text-gray-400 text-sm">호텔 정보가 없습니다.</p>
             ) : (
@@ -216,9 +216,9 @@ export default function TripPage() {
                     onClick={() => selectHotel(i)}
                     className={`p-4 rounded-xl border-2 cursor-pointer transition ${selectedHotel === i ? "border-indigo-500 bg-indigo-50" : "border-gray-100 hover:border-indigo-300"}`}
                   >
-                    <div className="font-semibold">{h.name}</div>
-                    <div className="text-amber-400 text-sm">{"★".repeat(h.stars)}{"☆".repeat(5 - h.stars)}</div>
-                    <div className="text-sm text-gray-500">{h.area} | {h.price} | {h.note}</div>
+                    <div className="font-semibold text-sm md:text-base">{h.name}</div>
+                    <div className="text-amber-400 text-xs md:text-sm">{"★".repeat(h.stars)}{"☆".repeat(5 - h.stars)}</div>
+                    <div className="text-xs md:text-sm text-gray-500">{h.area} | {h.price} | {h.note}</div>
                   </div>
                 ))}
               </div>
@@ -226,16 +226,16 @@ export default function TripPage() {
           </div>
 
           {/* 지도 */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <h3 className="font-semibold mb-3 pb-2 border-b">공항에서 호텔까지 동선</h3>
-            <div ref={mapContainerRef} className="h-[400px] rounded-xl" />
+          <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm">
+            <h3 className="font-semibold mb-3 pb-2 border-b text-sm md:text-base">공항에서 호텔까지 동선</h3>
+            <div ref={mapContainerRef} className="h-[280px] md:h-[400px] rounded-xl" />
             {routeSummary && (
               <div className="bg-indigo-50 rounded-xl p-4 mt-4" dangerouslySetInnerHTML={{ __html: routeSummary }} />
             )}
           </div>
 
-          <div className="text-center pb-6">
-            <button onClick={saveTripPlan} className="bg-green-500 text-white px-8 py-3 rounded-xl text-sm hover:bg-green-600 transition font-semibold">
+          <div className="text-center pb-4 md:pb-6">
+            <button onClick={saveTripPlan} className="w-full md:w-auto bg-green-500 text-white px-8 py-3 rounded-xl text-sm hover:bg-green-600 transition font-semibold active:scale-95">
               출장 계획 저장
             </button>
           </div>

@@ -40,6 +40,7 @@ export const api = {
 
   // 출장
   getTrips: (execId?: number) => request(`/api/trips${execId ? `?exec_id=${execId}` : ''}`),
+  getTrip: (id: number) => request(`/api/trips/${id}`),
   getUpcomingTrips: () => request('/api/trips/upcoming'),
   createTrip: (data: any) => request('/api/trips', { method: 'POST', body: JSON.stringify(data) }),
   deleteTrip: (id: number) => request(`/api/trips/${id}`, { method: 'DELETE' }),

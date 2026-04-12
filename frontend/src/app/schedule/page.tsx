@@ -11,6 +11,7 @@ export default function SchedulePage() {
   const [executives, setExecutives] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
   const [calendarDates, setCalendarDates] = useState<string[]>([]);
+  const [trips, setTrips] = useState<any[]>([]);
   const [filterExec, setFilterExec] = useState("all");
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
@@ -20,12 +21,14 @@ export default function SchedulePage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [execs, cal] = await Promise.all([
+      const [execs, cal, allTrips] = await Promise.all([
         api.getExecutives(),
         api.getCalendarDates(currentYear, currentMonth),
+        api.getTrips(),
       ]);
       setExecutives(execs);
       setCalendarDates(cal);
+      setTrips(allTrips);
       const today = new Date().toISOString().slice(0, 10);
       const params: any = { date_from: today };
       if (filterExec !== "all") params.exec_id = Number(filterExec);
@@ -109,19 +112,33 @@ export default function SchedulePage() {
             const dateStr = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
             const isToday = dateStr === todayStr;
             const hasEvent = calendarDates.includes(dateStr);
+            // 이 날짜에 진행 중인 출장이 있는지
+            const onTrip = trips.some((t: any) => {
+              const start = t.date;
+              const end = t.return_date || t.date;
+              return dateStr >= start && dateStr <= end;
+            });
             return (
               <div
                 key={day}
                 onClick={() => openModalWithDate(dateStr)}
-                className={`py-1.5 md:py-2 rounded-lg cursor-pointer flex flex-col items-center transition text-xs md:text-sm active:scale-95
-                  ${isToday ? "bg-indigo-500 text-white font-bold" : "hover:bg-indigo-50"}
+                className={`relative py-1.5 md:py-2 rounded-lg cursor-pointer flex flex-col items-center transition text-xs md:text-sm active:scale-95
+                  ${isToday ? "bg-indigo-500 text-white font-bold" : onTrip ? "bg-amber-50" : "hover:bg-indigo-50"}
                 `}
               >
                 {day}
-                {hasEvent && <div className={`w-1 h-1 md:w-1.5 md:h-1.5 rounded-full mt-0.5 ${isToday ? "bg-white" : "bg-red-500"}`} />}
+                <div className="flex gap-0.5 mt-0.5">
+                  {hasEvent && <div className={`w-1 h-1 md:w-1.5 md:h-1.5 rounded-full ${isToday ? "bg-white" : "bg-red-500"}`} />}
+                  {onTrip && <div className={`w-1 h-1 md:w-1.5 md:h-1.5 rounded-full ${isToday ? "bg-white" : "bg-amber-500"}`} />}
+                </div>
               </div>
             );
           })}
+        </div>
+        <div className="flex gap-3 mt-3 text-[10px] md:text-xs text-gray-500 justify-center">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> 일정</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" /> 출장</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-500" /> 오늘</span>
         </div>
       </div>
 

@@ -22,7 +22,11 @@ export default function AdminPage() {
   const [showDetail, setShowDetail] = useState<any>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editData, setEditData] = useState<any>(null);
-  const [form, setForm] = useState({ name: "", position: "상무", dept: "", phone: "", email: "", note: "" });
+  const [form, setForm] = useState({
+    name: "", position: "상무", dept: "", phone: "", email: "", note: "",
+    preferred_airline: "", seat_class: "비즈니스", hotel_grade: "5성",
+    preferred_hotel_chain: "", dietary: "", passport_no: "", passport_expiry: "",
+  });
 
   const loadData = useCallback(async () => {
     try {
@@ -38,7 +42,11 @@ export default function AdminPage() {
     if (!form.name) { alert("이름을 입력해 주세요."); return; }
     try {
       await api.createExecutive(form);
-      setForm({ name: "", position: "상무", dept: "", phone: "", email: "", note: "" });
+      setForm({
+        name: "", position: "상무", dept: "", phone: "", email: "", note: "",
+        preferred_airline: "", seat_class: "비즈니스", hotel_grade: "5성",
+        preferred_hotel_chain: "", dietary: "", passport_no: "", passport_expiry: "",
+      });
       setShowAddForm(false);
       loadData();
     } catch (e: any) { alert(e.message); }
@@ -46,7 +54,17 @@ export default function AdminPage() {
 
   function openEdit(exec: any) {
     setEditData(exec);
-    setForm({ name: exec.name, position: exec.position, dept: exec.dept || "", phone: exec.phone || "", email: exec.email || "", note: exec.note || "" });
+    setForm({
+      name: exec.name, position: exec.position, dept: exec.dept || "",
+      phone: exec.phone || "", email: exec.email || "", note: exec.note || "",
+      preferred_airline: exec.preferred_airline || "",
+      seat_class: exec.seat_class || "비즈니스",
+      hotel_grade: exec.hotel_grade || "5성",
+      preferred_hotel_chain: exec.preferred_hotel_chain || "",
+      dietary: exec.dietary || "",
+      passport_no: exec.passport_no || "",
+      passport_expiry: exec.passport_expiry || "",
+    });
     setShowModal(true);
   }
 
@@ -139,6 +157,49 @@ export default function AdminPage() {
               <input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="특이사항..." className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg" />
             </div>
           </div>
+
+          {/* 출장 선호도 */}
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <h3 className="text-xs font-semibold text-gray-500 mb-2">⭐ 출장 선호 사항</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">선호 항공사</label>
+                <input value={form.preferred_airline} onChange={(e) => setForm({ ...form, preferred_airline: e.target.value })} placeholder="대한항공, 에미레이트..." className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">좌석 등급</label>
+                <select value={form.seat_class} onChange={(e) => setForm({ ...form, seat_class: e.target.value })} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg">
+                  <option>퍼스트</option>
+                  <option>비즈니스</option>
+                  <option>프리미엄 이코노미</option>
+                  <option>이코노미</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">호텔 등급</label>
+                <select value={form.hotel_grade} onChange={(e) => setForm({ ...form, hotel_grade: e.target.value })} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg">
+                  <option>5성</option>
+                  <option>4성</option>
+                  <option>3성</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">선호 호텔 체인</label>
+                <input value={form.preferred_hotel_chain} onChange={(e) => setForm({ ...form, preferred_hotel_chain: e.target.value })} placeholder="메리어트, 힐튼..." className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">식이 사항</label>
+                <input value={form.dietary} onChange={(e) => setForm({ ...form, dietary: e.target.value })} placeholder="채식, 할랄..." className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">여권 만료일</label>
+                <input type="date" value={form.passport_expiry} onChange={(e) => setForm({ ...form, passport_expiry: e.target.value })} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg" />
+              </div>
+            </div>
+          </div>
+
           <button onClick={addExec} className="w-full md:w-auto bg-indigo-500 text-white px-5 py-2.5 rounded-lg text-sm hover:bg-indigo-600 active:scale-95">임원 등록</button>
         </div>
       </div>
@@ -266,7 +327,48 @@ export default function AdminPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">비고</label>
-                <textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={3} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg" />
+                <textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={2} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg" />
+              </div>
+              <div className="pt-3 border-t border-gray-100">
+                <div className="text-xs font-semibold text-gray-500 mb-2">⭐ 출장 선호 사항</div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">선호 항공사</label>
+                    <input value={form.preferred_airline} onChange={(e) => setForm({ ...form, preferred_airline: e.target.value })} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">좌석 등급</label>
+                      <select value={form.seat_class} onChange={(e) => setForm({ ...form, seat_class: e.target.value })} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg">
+                        <option>퍼스트</option><option>비즈니스</option><option>프리미엄 이코노미</option><option>이코노미</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">호텔 등급</label>
+                      <select value={form.hotel_grade} onChange={(e) => setForm({ ...form, hotel_grade: e.target.value })} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg">
+                        <option>5성</option><option>4성</option><option>3성</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">선호 호텔 체인</label>
+                    <input value={form.preferred_hotel_chain} onChange={(e) => setForm({ ...form, preferred_hotel_chain: e.target.value })} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">식이 사항</label>
+                    <input value={form.dietary} onChange={(e) => setForm({ ...form, dietary: e.target.value })} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">여권 번호</label>
+                      <input value={form.passport_no} onChange={(e) => setForm({ ...form, passport_no: e.target.value })} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">여권 만료일</label>
+                      <input type="date" value={form.passport_expiry} onChange={(e) => setForm({ ...form, passport_expiry: e.target.value })} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg" />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="flex gap-2 mt-5">

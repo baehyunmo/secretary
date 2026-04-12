@@ -39,12 +39,20 @@ app.get('/:id', async (c) => {
 // 임원 등록
 app.post('/', async (c) => {
   const body = await c.req.json();
-  const { name, position, dept, phone, email, note } = body;
+  const {
+    name, position, dept, phone, email, note,
+    preferred_airline, seat_class, hotel_grade, preferred_hotel_chain, dietary, passport_no, passport_expiry,
+  } = body;
   if (!name) return c.json({ error: '이름은 필수입니다' }, 400);
 
   const result = await c.env.DB.prepare(
-    'INSERT INTO executives (name, position, dept, phone, email, note) VALUES (?, ?, ?, ?, ?, ?)'
-  ).bind(name, position || '기타', dept || '', phone || '', email || '', note || '').run();
+    `INSERT INTO executives (name, position, dept, phone, email, note, preferred_airline, seat_class, hotel_grade, preferred_hotel_chain, dietary, passport_no, passport_expiry)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    name, position || '기타', dept || '', phone || '', email || '', note || '',
+    preferred_airline || '', seat_class || '비즈니스', hotel_grade || '5성',
+    preferred_hotel_chain || '', dietary || '', passport_no || '', passport_expiry || ''
+  ).run();
 
   const exec = await c.env.DB.prepare('SELECT * FROM executives WHERE id = ?')
     .bind(result.meta.last_row_id).first();
@@ -55,11 +63,22 @@ app.post('/', async (c) => {
 app.put('/:id', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json();
-  const { name, position, dept, phone, email, note } = body;
+  const {
+    name, position, dept, phone, email, note,
+    preferred_airline, seat_class, hotel_grade, preferred_hotel_chain, dietary, passport_no, passport_expiry,
+  } = body;
 
   await c.env.DB.prepare(
-    'UPDATE executives SET name = ?, position = ?, dept = ?, phone = ?, email = ?, note = ? WHERE id = ?'
-  ).bind(name, position, dept || '', phone || '', email || '', note || '', id).run();
+    `UPDATE executives SET
+      name=?, position=?, dept=?, phone=?, email=?, note=?,
+      preferred_airline=?, seat_class=?, hotel_grade=?, preferred_hotel_chain=?, dietary=?, passport_no=?, passport_expiry=?
+     WHERE id=?`
+  ).bind(
+    name, position, dept || '', phone || '', email || '', note || '',
+    preferred_airline || '', seat_class || '비즈니스', hotel_grade || '5성',
+    preferred_hotel_chain || '', dietary || '', passport_no || '', passport_expiry || '',
+    id
+  ).run();
 
   const exec = await c.env.DB.prepare('SELECT * FROM executives WHERE id = ?').bind(id).first();
   return c.json(exec);

@@ -29,6 +29,20 @@ app.get('/upcoming', async (c) => {
   return c.json(results);
 });
 
+// 출장 단건 상세 (임원 선호도 포함)
+app.get('/:id', async (c) => {
+  const id = c.req.param('id');
+  const trip = await c.env.DB.prepare(
+    `SELECT t.*, e.name as exec_name, e.position as exec_position,
+      e.dept as exec_dept, e.phone as exec_phone, e.email as exec_email,
+      e.preferred_airline, e.seat_class, e.hotel_grade, e.preferred_hotel_chain,
+      e.dietary, e.passport_no, e.passport_expiry
+     FROM trips t JOIN executives e ON t.exec_id = e.id WHERE t.id = ?`
+  ).bind(id).first();
+  if (!trip) return c.json({ error: '출장을 찾을 수 없습니다' }, 404);
+  return c.json(trip);
+});
+
 // 출장 등록
 app.post('/', async (c) => {
   const body = await c.req.json();

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 
 export default function Dashboard() {
@@ -84,7 +85,7 @@ export default function Dashboard() {
         ) : (
           <div className="space-y-2 md:space-y-3">
             {upcomingTrips.map((t: any) => (
-              <div key={t.id} className="flex items-start gap-3 py-2.5 md:py-3 border-b border-gray-100 last:border-0">
+              <Link key={t.id} href={`/trip/detail?id=${t.id}`} className="flex items-start gap-3 py-2.5 md:py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 -mx-2 px-2 rounded-lg transition">
                 <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-xl px-2.5 py-1.5 md:px-3 md:py-2 text-center min-w-[50px] md:min-w-[60px]">
                   <div className="text-base md:text-lg font-bold">{new Date(t.date + "T00:00:00").getDate()}</div>
                   <div className="text-[10px] md:text-xs opacity-80">{new Date(t.date + "T00:00:00").toLocaleDateString("ko", { month: "short" })}</div>
@@ -94,7 +95,8 @@ export default function Dashboard() {
                   <div className="text-xs md:text-sm text-indigo-500">{t.date} ~ {t.return_date || "미정"}</div>
                   <div className="text-xs md:text-sm text-gray-500 truncate">노선: {t.route || "미정"} | 호텔: {t.hotel || "미정"}</div>
                 </div>
-              </div>
+                <div className="text-gray-300 self-center">→</div>
+              </Link>
             ))}
           </div>
         )}

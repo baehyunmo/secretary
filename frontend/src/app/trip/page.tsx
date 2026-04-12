@@ -3,6 +3,8 @@ import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/api";
 import { AIRPORTS, LAYOVERS, HOTELS, DEPARTURE_CITIES, DESTINATION_CITIES, getLayoverKey, getTransportAdvice } from "@/lib/trip-data";
 import type { RouteOption, HotelOption } from "@/lib/trip-data";
+import { DESTINATION_INFO } from "@/lib/destination-info";
+import { fetchWeather, fetchExchangeRate } from "@/lib/external-api";
 
 // Leaflet JS 동적 로드 (한 번만)
 let leafletPromise: Promise<any> | null = null;
@@ -60,6 +62,10 @@ export default function TripPage() {
   const [routeSummary, setRouteSummary] = useState<string>("");
   const [mapLoading, setMapLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
+  const [comparedRoutes, setComparedRoutes] = useState<Set<number>>(new Set());
+  const [destWeather, setDestWeather] = useState<any>(null);
+  const [destRate, setDestRate] = useState<number | null>(null);
   const mapRef = useRef<any>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
@@ -90,6 +96,19 @@ export default function TripPage() {
     setRoutes(key ? LAYOVERS[key] : []);
     setHotels(HOTELS[toCode] || []);
     setShowResults(true);
+    setComparedRoutes(new Set());
+
+    // 현지 정보 조회
+    const airport = AIRPORTS[toCode];
+    if (airport) {
+      fetchWeather(airport.lat, airport.lng).then(setDestWeather);
+    }
+    const info = DESTINATION_INFO[toCode];
+    if (info?.currency) {
+      fetchExchangeRate("KRW", info.currency).then(setDestRate);
+    } else {
+      setDestRate(null);
+    }
 
     // Leaflet 로드 후 지도 초기화
     setMapLoading(true);
@@ -275,19 +294,99 @@ export default function TripPage() {
 
       {showResults && (
         <>
+          {/* 현지 정보 패널 */}
+          {DESTINATION_INFO[toCode] && (
+            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-4 md:p-5 border-2 border-indigo-100">
+              <h3 className="font-semibold text-sm md:text-base mb-3">🌍 {AIRPORTS[toCode]?.city} 현지 정보</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs md:text-sm">
+                <div className="bg-white rounded-lg p-2.5">
+                  <div className="text-[10px] text-gray-400">시차</div>
+                  <div className="font-semibold">
+                    KST {DESTINATION_INFO[toCode].tzOffset >= 0 ? "+" : ""}{DESTINATION_INFO[toCode].tzOffset}h
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-2.5">
+                  <div className="text-[10px] text-gray-400">비자</div>
+                  <div className="font-semibold text-[11px]">{DESTINATION_INFO[toCode].visa}</div>
+                </div>
+                <div className="bg-white rounded-lg p-2.5">
+                  <div className="text-[10px] text-gray-400">환율 (1,000원)</div>
+                  <div className="font-semibold">
+                    {destRate ? `≈ ${(destRate * 1000).toFixed(2)} ${DESTINATION_INFO[toCode].currency}` : DESTINATION_INFO[toCode].currency}
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-2.5">
+                  <div className="text-[10px] text-gray-400">날씨</div>
+                  <div className="font-semibold text-[11px]">
+                    {destWeather ? `${destWeather.temp}°C ${destWeather.desc}` : "조회 중..."}
+                  </div>
+                </div>
+              </div>
+              {DESTINATION_INFO[toCode].notes && DESTINATION_INFO[toCode].notes.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-indigo-100">
+                  <div className="text-[10px] text-gray-400 mb-1">⚠️ 주의사항</div>
+                  <ul className="text-[11px] md:text-xs text-gray-700 space-y-0.5">
+                    {DESTINATION_INFO[toCode].notes.map((n, i) => <li key={i}>• {n}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 추천 노선 */}
           <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm">
-            <div className="flex justify-between items-center mb-3 pb-2 border-b">
+            <div className="flex justify-between items-center mb-3 pb-2 border-b flex-wrap gap-2">
               <h3 className="font-semibold text-sm md:text-base">✈️ 추천 항공 노선</h3>
-              <a
-                href={googleFlightsUrl(fromCode, toCode, tripDate, returnDate)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-indigo-500 hover:underline"
-              >
-                Google Flights에서 보기 →
-              </a>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setCompareMode(!compareMode); setComparedRoutes(new Set()); }}
+                  className={`text-xs px-2.5 py-1 rounded-lg border-2 transition active:scale-95 ${
+                    compareMode ? "bg-indigo-500 text-white border-indigo-500" : "border-gray-200 text-gray-600"
+                  }`}
+                >
+                  {compareMode ? "비교 종료" : "🔀 비교"}
+                </button>
+                <a
+                  href={googleFlightsUrl(fromCode, toCode, tripDate, returnDate)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-500 hover:underline"
+                >
+                  Google Flights →
+                </a>
+              </div>
             </div>
+
+            {/* 비교 뷰 */}
+            {compareMode && comparedRoutes.size > 0 && (
+              <div className="mb-3 p-3 bg-indigo-50 rounded-xl">
+                <div className="text-xs font-semibold text-indigo-700 mb-2">선택한 노선 비교 ({comparedRoutes.size}개)</div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-gray-500">
+                        <th className="py-1 pr-2">유형</th>
+                        <th className="py-1 pr-2">소요</th>
+                        <th className="py-1">특징</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from(comparedRoutes).sort().map((idx) => {
+                        const r = routes[idx];
+                        if (!r) return null;
+                        return (
+                          <tr key={idx} className="border-t border-indigo-200">
+                            <td className="py-1.5 pr-2 font-semibold">{r.stops.length === 0 ? "직항" : r.stops.join(",")}</td>
+                            <td className="py-1.5 pr-2">{r.duration}</td>
+                            <td className="py-1.5 text-gray-600">{r.tags.join(", ") || "-"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
             {routes.length === 0 ? (
               <p className="text-gray-400 text-sm py-4 text-center">사전 등록된 노선 정보가 없습니다.</p>
             ) : (
@@ -296,10 +395,25 @@ export default function TripPage() {
                   <div
                     key={i}
                     className={`p-3 md:p-4 rounded-xl border-2 transition ${
-                      selectedRoute === i ? "border-indigo-500 bg-indigo-50" : "border-gray-100"
+                      selectedRoute === i ? "border-indigo-500 bg-indigo-50" : comparedRoutes.has(i) ? "border-purple-400 bg-purple-50" : "border-gray-100"
                     }`}
                   >
-                    <div onClick={() => setSelectedRoute(i)} className="cursor-pointer active:scale-[0.99]">
+                    {compareMode && (
+                      <label className="flex items-center gap-2 mb-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={comparedRoutes.has(i)}
+                          onChange={() => {
+                            const next = new Set(comparedRoutes);
+                            if (next.has(i)) next.delete(i); else next.add(i);
+                            setComparedRoutes(next);
+                          }}
+                          className="w-4 h-4 accent-indigo-500"
+                        />
+                        <span className="text-xs text-gray-600">비교에 추가</span>
+                      </label>
+                    )}
+                    <div onClick={() => !compareMode && setSelectedRoute(i)} className={!compareMode ? "cursor-pointer active:scale-[0.99]" : ""}>
                       <div className="font-semibold text-sm md:text-base">
                         {r.stops.length === 0 ? "직항" : `경유: ${r.stops.join(", ")}`} ({r.duration})
                       </div>

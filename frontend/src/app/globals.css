@@ -18,3 +18,23 @@
     font-size: 16px !important;
   }
 }
+
+/* 인쇄 스타일 */
+@media print {
+  body {
+    background: white !important;
+  }
+  header, nav, .no-print {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  .bg-white {
+    box-shadow: none !important;
+  }
+  @page {
+    margin: 1.5cm;
+  }
+}

@@ -4,6 +4,47 @@ import { api } from "@/lib/api";
 import { AIRPORTS, LAYOVERS, HOTELS, DEPARTURE_CITIES, DESTINATION_CITIES, getLayoverKey, getTransportAdvice } from "@/lib/trip-data";
 import type { RouteOption, HotelOption } from "@/lib/trip-data";
 
+// Leaflet JS 동적 로드 (한 번만)
+let leafletPromise: Promise<any> | null = null;
+function loadLeaflet(): Promise<any> {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  const w = window as any;
+  if (w.L) return Promise.resolve(w.L);
+  if (leafletPromise) return leafletPromise;
+
+  leafletPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.async = true;
+    script.onload = () => resolve((window as any).L);
+    script.onerror = () => reject(new Error("Leaflet 로드 실패"));
+    document.head.appendChild(script);
+  });
+  return leafletPromise;
+}
+
+// 예약 사이트 URL 생성
+function flightBookingUrl(from: string, to: string, date: string, returnDate: string): string {
+  const d = date || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const r = returnDate || new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+  // Skyscanner: yymmdd 형식
+  const fmt = (s: string) => s.slice(2).replace(/-/g, "");
+  return `https://www.skyscanner.co.kr/transport/flights/${from.toLowerCase()}/${to.toLowerCase()}/${fmt(d)}/${fmt(r)}/`;
+}
+
+function hotelBookingUrl(cityName: string, hotelName: string, date: string, returnDate: string): string {
+  const checkin = date || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const checkout = returnDate || new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+  const query = encodeURIComponent(`${hotelName} ${cityName}`);
+  return `https://www.booking.com/searchresults.ko.html?ss=${query}&checkin=${checkin}&checkout=${checkout}`;
+}
+
+function googleFlightsUrl(from: string, to: string, date: string, returnDate: string): string {
+  const d = date || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const r = returnDate || new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+  return `https://www.google.com/travel/flights?q=Flights%20from%20${from}%20to%20${to}%20on%20${d}%20returning%20${r}`;
+}
+
 export default function TripPage() {
   const [executives, setExecutives] = useState<any[]>([]);
   const [execId, setExecId] = useState("");
@@ -17,6 +58,8 @@ export default function TripPage() {
   const [selectedHotel, setSelectedHotel] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [routeSummary, setRouteSummary] = useState<string>("");
+  const [mapLoading, setMapLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const mapRef = useRef<any>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
@@ -27,7 +70,17 @@ export default function TripPage() {
     }).catch(() => {});
   }, []);
 
-  function searchTrip() {
+  // 컴포넌트 언마운트 시 지도 정리
+  useEffect(() => {
+    return () => {
+      if (mapRef.current) {
+        try { mapRef.current.remove(); } catch {}
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
+  async function searchTrip() {
     if (!toCode) { alert("도착 도시를 선택해 주세요."); return; }
     setSelectedRoute(null);
     setSelectedHotel(null);
@@ -38,7 +91,19 @@ export default function TripPage() {
     setHotels(HOTELS[toCode] || []);
     setShowResults(true);
 
-    setTimeout(() => initMap(), 200);
+    // Leaflet 로드 후 지도 초기화
+    setMapLoading(true);
+    try {
+      await loadLeaflet();
+      // DOM이 렌더링될 시간을 줌
+      setTimeout(() => {
+        initMap();
+        setMapLoading(false);
+      }, 100);
+    } catch {
+      setMapLoading(false);
+      alert("지도를 불러올 수 없습니다. 인터넷 연결을 확인해 주세요.");
+    }
   }
 
   function initMap() {
@@ -46,27 +111,50 @@ export default function TripPage() {
     const L = (window as any).L;
     if (!L) return;
 
-    if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+    if (mapRef.current) {
+      try { mapRef.current.remove(); } catch {}
+      mapRef.current = null;
+    }
 
     const airport = AIRPORTS[toCode];
     if (!airport) return;
 
     const map = L.map(mapContainerRef.current).setView([airport.lat, airport.lng], 12);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap" }).addTo(map);
-    L.marker([airport.lat, airport.lng]).addTo(map).bindPopup(`<b>${airport.name}</b>`).openPopup();
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap",
+      maxZoom: 19,
+    }).addTo(map);
+
+    L.marker([airport.lat, airport.lng])
+      .addTo(map)
+      .bindPopup(`<b>${airport.name}</b><br/>공항`)
+      .openPopup();
 
     const hotelList = HOTELS[toCode] || [];
     hotelList.forEach((h, i) => {
       L.marker([h.lat, h.lng], {
         icon: L.divIcon({
           className: "",
-          html: `<div style="background:#667eea;color:white;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.3);">${i + 1}</div>`,
-          iconSize: [24, 24], iconAnchor: [12, 12],
+          html: `<div style="background:#667eea;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:bold;border:3px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.3);">${i + 1}</div>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
         }),
       }).addTo(map).bindPopup(`<b>${h.name}</b><br>${h.area} | ${h.price}`);
     });
 
+    // 모든 마커가 보이게 fit
+    if (hotelList.length > 0) {
+      const bounds = L.latLngBounds([
+        [airport.lat, airport.lng],
+        ...hotelList.map((h) => [h.lat, h.lng]),
+      ]);
+      map.fitBounds(bounds, { padding: [40, 40] });
+    }
+
     mapRef.current = map;
+
+    // 컨테이너 크기 변경 대응
+    setTimeout(() => map.invalidateSize(), 200);
   }
 
   function selectHotel(idx: number) {
@@ -78,7 +166,9 @@ export default function TripPage() {
     const L = (window as any).L;
     const map = mapRef.current;
 
-    map.eachLayer((l: any) => { if (l instanceof L.Polyline) map.removeLayer(l); });
+    map.eachLayer((l: any) => {
+      if (l instanceof L.Polyline) map.removeLayer(l);
+    });
 
     const line = L.polyline([[airport.lat, airport.lng], [hotel.lat, hotel.lng]], {
       color: "#667eea", weight: 4, dashArray: "10,8", opacity: 0.8,
@@ -105,7 +195,10 @@ export default function TripPage() {
   }
 
   async function saveTripPlan() {
+    if (!execId) { alert("임원을 먼저 선택하거나 등록해 주세요."); return; }
     if (!toCode || !tripDate) { alert("도착 도시와 출발일을 입력해 주세요."); return; }
+
+    setSaving(true);
     const route = selectedRoute !== null ? routes[selectedRoute] : null;
     const hotel = selectedHotel !== null ? hotels[selectedHotel] : null;
 
@@ -123,8 +216,12 @@ export default function TripPage() {
         hotel_area: hotel?.area || "",
         transport_note: getTransportAdvice(toCode),
       });
-      alert("출장 계획이 저장되었습니다! 일정에도 자동 등록됩니다.");
-    } catch (e: any) { alert(e.message); }
+      alert("✅ 출장 계획이 저장되었습니다!\n일정에도 자동 등록되었습니다.");
+    } catch (e: any) {
+      alert("저장 실패: " + e.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   const tagClass: Record<string, string> = {
@@ -141,6 +238,7 @@ export default function TripPage() {
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">임원</label>
             <select value={execId} onChange={(e) => setExecId(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg">
+              {executives.length === 0 && <option value="">-- 등록된 임원 없음 --</option>}
               {executives.map((e: any) => <option key={e.id} value={e.id}>{e.position} {e.name}</option>)}
             </select>
           </div>
@@ -168,8 +266,8 @@ export default function TripPage() {
             <input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg" />
           </div>
           <div className="col-span-2 md:col-span-1 flex items-end">
-            <button onClick={searchTrip} className="w-full bg-indigo-500 text-white px-4 py-2.5 rounded-lg text-sm hover:bg-indigo-600 transition active:scale-95">
-              노선 및 호텔 검색
+            <button onClick={searchTrip} className="w-full bg-indigo-500 text-white px-4 py-2.5 rounded-lg text-sm hover:bg-indigo-600 transition active:scale-95 font-semibold">
+              🔍 노선 및 호텔 검색
             </button>
           </div>
         </div>
@@ -179,23 +277,66 @@ export default function TripPage() {
         <>
           {/* 추천 노선 */}
           <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm">
-            <h3 className="font-semibold mb-3 pb-2 border-b text-sm md:text-base">추천 항공 노선</h3>
+            <div className="flex justify-between items-center mb-3 pb-2 border-b">
+              <h3 className="font-semibold text-sm md:text-base">✈️ 추천 항공 노선</h3>
+              <a
+                href={googleFlightsUrl(fromCode, toCode, tripDate, returnDate)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-indigo-500 hover:underline"
+              >
+                Google Flights에서 보기 →
+              </a>
+            </div>
             {routes.length === 0 ? (
-              <p className="text-gray-400 text-sm">사전 등록된 노선 정보가 없습니다.</p>
+              <p className="text-gray-400 text-sm py-4 text-center">사전 등록된 노선 정보가 없습니다.</p>
             ) : (
               <div className="space-y-2">
                 {routes.map((r, i) => (
                   <div
                     key={i}
-                    onClick={() => setSelectedRoute(i)}
-                    className={`p-4 rounded-xl border-2 cursor-pointer transition ${selectedRoute === i ? "border-indigo-500 bg-indigo-50" : "border-gray-100 hover:border-indigo-300"}`}
+                    className={`p-3 md:p-4 rounded-xl border-2 transition ${
+                      selectedRoute === i ? "border-indigo-500 bg-indigo-50" : "border-gray-100"
+                    }`}
                   >
-                    <div className="font-semibold text-sm md:text-base">{r.stops.length === 0 ? "직항" : `경유: ${r.stops.join(", ")}`} ({r.duration})</div>
-                    <div className="text-xs md:text-sm text-gray-500 mt-1">{r.note}</div>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {r.tags.map((t) => (
-                        <span key={t} className={`px-2 py-0.5 rounded-lg text-xs font-semibold ${tagClass[t] || "bg-gray-100 text-gray-500"}`}>{t}</span>
-                      ))}
+                    <div onClick={() => setSelectedRoute(i)} className="cursor-pointer active:scale-[0.99]">
+                      <div className="font-semibold text-sm md:text-base">
+                        {r.stops.length === 0 ? "직항" : `경유: ${r.stops.join(", ")}`} ({r.duration})
+                      </div>
+                      <div className="text-xs md:text-sm text-gray-500 mt-1">{r.note}</div>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {r.tags.map((t) => (
+                          <span key={t} className={`px-2 py-0.5 rounded-lg text-xs font-semibold ${tagClass[t] || "bg-gray-100 text-gray-500"}`}>
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                      <a
+                        href={flightBookingUrl(fromCode, toCode, tripDate, returnDate)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 bg-blue-500 text-white text-xs text-center py-2 rounded-lg hover:bg-blue-600 transition active:scale-95 font-semibold"
+                      >
+                        Skyscanner 가격 비교
+                      </a>
+                      <a
+                        href={`https://www.koreanair.com/booking/`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 bg-sky-600 text-white text-xs text-center py-2 rounded-lg hover:bg-sky-700 transition active:scale-95 font-semibold"
+                      >
+                        대한항공
+                      </a>
+                      <a
+                        href={`https://flyasiana.com/`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 bg-red-500 text-white text-xs text-center py-2 rounded-lg hover:bg-red-600 transition active:scale-95 font-semibold"
+                      >
+                        아시아나
+                      </a>
                     </div>
                   </div>
                 ))}
@@ -205,20 +346,61 @@ export default function TripPage() {
 
           {/* 추천 호텔 */}
           <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm">
-            <h3 className="font-semibold mb-3 pb-2 border-b text-sm md:text-base">추천 호텔</h3>
+            <div className="flex justify-between items-center mb-3 pb-2 border-b">
+              <h3 className="font-semibold text-sm md:text-base">🏨 추천 호텔</h3>
+              <a
+                href={`https://www.booking.com/searchresults.ko.html?ss=${encodeURIComponent(AIRPORTS[toCode]?.city || toCode)}&checkin=${tripDate}&checkout=${returnDate}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-indigo-500 hover:underline"
+              >
+                Booking.com에서 더 보기 →
+              </a>
+            </div>
             {hotels.length === 0 ? (
-              <p className="text-gray-400 text-sm">호텔 정보가 없습니다.</p>
+              <p className="text-gray-400 text-sm py-4 text-center">호텔 정보가 없습니다.</p>
             ) : (
               <div className="space-y-2">
                 {hotels.map((h, i) => (
                   <div
                     key={i}
-                    onClick={() => selectHotel(i)}
-                    className={`p-4 rounded-xl border-2 cursor-pointer transition ${selectedHotel === i ? "border-indigo-500 bg-indigo-50" : "border-gray-100 hover:border-indigo-300"}`}
+                    className={`p-3 md:p-4 rounded-xl border-2 transition ${
+                      selectedHotel === i ? "border-indigo-500 bg-indigo-50" : "border-gray-100"
+                    }`}
                   >
-                    <div className="font-semibold text-sm md:text-base">{h.name}</div>
-                    <div className="text-amber-400 text-xs md:text-sm">{"★".repeat(h.stars)}{"☆".repeat(5 - h.stars)}</div>
-                    <div className="text-xs md:text-sm text-gray-500">{h.area} | {h.price} | {h.note}</div>
+                    <div onClick={() => selectHotel(i)} className="cursor-pointer active:scale-[0.99]">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm md:text-base">
+                            <span className="inline-flex items-center justify-center w-5 h-5 bg-indigo-500 text-white rounded-full text-[10px] font-bold mr-2">{i + 1}</span>
+                            {h.name}
+                          </div>
+                          <div className="text-amber-400 text-xs md:text-sm mt-0.5">
+                            {"★".repeat(h.stars)}{"☆".repeat(5 - h.stars)}
+                          </div>
+                          <div className="text-xs md:text-sm text-gray-500 mt-0.5">{h.area} | {h.price}</div>
+                          <div className="text-xs text-gray-400 mt-0.5">{h.note}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                      <a
+                        href={hotelBookingUrl(AIRPORTS[toCode]?.city || toCode, h.name, tripDate, returnDate)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 bg-blue-600 text-white text-xs text-center py-2 rounded-lg hover:bg-blue-700 transition active:scale-95 font-semibold"
+                      >
+                        Booking.com 예약
+                      </a>
+                      <a
+                        href={`https://www.agoda.com/search?city=${encodeURIComponent(AIRPORTS[toCode]?.city || toCode)}&textToSearch=${encodeURIComponent(h.name)}&checkin=${tripDate}&checkout=${returnDate}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 bg-orange-500 text-white text-xs text-center py-2 rounded-lg hover:bg-orange-600 transition active:scale-95 font-semibold"
+                      >
+                        Agoda 예약
+                      </a>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -227,16 +409,30 @@ export default function TripPage() {
 
           {/* 지도 */}
           <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm">
-            <h3 className="font-semibold mb-3 pb-2 border-b text-sm md:text-base">공항에서 호텔까지 동선</h3>
-            <div ref={mapContainerRef} className="h-[280px] md:h-[400px] rounded-xl" />
+            <h3 className="font-semibold mb-3 pb-2 border-b text-sm md:text-base">🗺️ 공항에서 호텔까지 동선</h3>
+            <div className="relative">
+              <div ref={mapContainerRef} className="h-[280px] md:h-[400px] rounded-xl bg-gray-100" />
+              {mapLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-100/80 rounded-xl">
+                  <div className="text-sm text-gray-500">지도를 불러오는 중...</div>
+                </div>
+              )}
+            </div>
+            {!routeSummary && !mapLoading && (
+              <p className="text-xs text-gray-400 mt-3 text-center">호텔을 선택하면 동선이 표시됩니다.</p>
+            )}
             {routeSummary && (
               <div className="bg-indigo-50 rounded-xl p-4 mt-4" dangerouslySetInnerHTML={{ __html: routeSummary }} />
             )}
           </div>
 
           <div className="text-center pb-4 md:pb-6">
-            <button onClick={saveTripPlan} className="w-full md:w-auto bg-green-500 text-white px-8 py-3 rounded-xl text-sm hover:bg-green-600 transition font-semibold active:scale-95">
-              출장 계획 저장
+            <button
+              onClick={saveTripPlan}
+              disabled={saving}
+              className="w-full md:w-auto bg-green-500 text-white px-8 py-3 rounded-xl text-sm hover:bg-green-600 transition font-semibold active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? "저장 중..." : "💾 출장 계획 저장"}
             </button>
           </div>
         </>
